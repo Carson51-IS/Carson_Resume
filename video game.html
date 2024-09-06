@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokémon Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        #game-area {
+            width: 600px;
+            margin: 50px auto;
+        }
+
+        #map {
+            width: 600px;
+            height: 600px;
+            background: #a2d149;
+            position: relative;
+            border: 2px solid black;
+        }
+
+        #player {
+            width: 60px;
+            height: 60px;
+            background-color: red;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #battle, #choose-pokemon, #game-over {
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .pokemon {
+            display: inline-block;
+            cursor: pointer;
+            border: 2px solid black;
+            padding: 10px;
+            margin: 5px;
+        }
+
+        .pokemon:hover {
+            background-color: lightgray;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-area">
+        <!-- Pokémon Selection -->
+        <div id="choose-pokemon">
+            <h2>Choose your Pokémon!</h2>
+            <div class="pokemon" onclick="showStats(0)">Bulbasaur</div>
+            <div class="pokemon" onclick="showStats(1)">Charmander</div>
+            <div class="pokemon" onclick="showStats(2)">Squirtle</div>
+            <p id="pokemon-stats"></p>
+            <button id="select-button" class="hidden" onclick="selectPokemon()">Select Pokémon</button>
+        </div>
+
+        <!-- Map for movement -->
+        <div id="map" class="hidden">
+            <div id="player"></div>
+        </div>
+
+        <!-- Battle screen -->
+        <div id="battle" class="hidden">
+            <h2>A wild Pokémon appeared!</h2>
+            <div id="wild-pokemon">Wild Pokémon: <span></span></div>
+            <div id="player-hp">Your HP: <span>100</span></div>
+            <div id="enemy-hp">Enemy HP: <span>50</span></div>
+            <div id="move-options">
+                <button id="move1-btn" onclick="useMove(0)">Move 1</button>
+                <button id="move2-btn" onclick="useMove(1)">Move 2</button>
+            </div>
+            <p id="battle-message"></p>
+        </div>
+
+        <!-- Game Over screen -->
+        <div id="game-over" class="hidden">
+            <h2 id="game-over-message"></h2>
+            <button onclick="restartGame()">Restart Game</button>
+        </div>
+
+        <div id="message">Use arrow keys to move</div>
+    </div>
+
+    <script>
+        const player = document.getElementById("player");
+        const map = document.getElementById("map");
+        const message = document.getElementById("message");
+        const battleScreen = document.getElementById("battle");
+        const gameOverScreen = document.getElementById("game-over");
+        const playerHP = document.querySelector("#player-hp span");
+        const enemyHP = document.querySelector("#enemy-hp span");
+        const wildPokemonDisplay = document.querySelector("#wild-pokemon span");
+        const pokemonStats = document.getElementById("pokemon-stats");
+        const selectButton = document.getElementById("select-button");
+        const battleMessage = document.getElementById("battle-message");
+        const gameOverMessage = document.getElementById("game-over-message");
+
+        let playerPokemon = null;
+        let playerPosition = { x: 0, y: 0 };
+        let inBattle = false;
+        let wildPokemon = null;
+
+        // Define Pokémon with stats, types, and moves
+        const pokemonChoices = [
+            {
+                name: "Bulbasaur",
+                type: "Grass",
+                hp: 100,
+                attack: 15,
+                defense: 10,
+                moves: [
+                    { name: "Tackle", power: 10, type: "Normal" },
+                    { name: "Vine Whip", power: 20, type: "Grass" }
+                ]
+            },
+            {
+                name: "Charmander",
+                type: "Fire",
+                hp: 90,
+                attack: 20,
+                defense: 8,
+                moves: [
+                    { name: "Scratch", power: 15, type: "Normal" },
+                    { name: "Ember", power: 25, type: "Fire" }
+                ]
+            },
+            {
+                name: "Squirtle",
+                type: "Water",
+                hp: 110,
+                attack: 12,
+                defense: 12,
+                moves: [
+                    { name: "Tackle", power: 10, type: "Normal" },
+                    { name: "Water Gun", power: 20, type: "Water" }
+                ]
+            }
+        ];
+
+        const wildPokemonPool = [
+            { name: "Oddish", type: "Grass", hp: 50 },
+            { name: "Pikachu", type: "Electric", hp: 50 },
+            { name: "Geodude", type: "Ground", hp: 60 },
+            { name: "Growlithe", type: "Fire", hp: 55 },
+            { name: "Poliwag", type: "Water", hp: 50 },
+            { name: "Caterpie", type: "Bug", hp: 40 },
+            { name: "Pidgey", type: "Flying", hp: 45 },
+            { name: "Zubat", type: "Poison", hp: 45 },
+            { name: "Rattata", type: "Normal", hp: 45 },
+            { name: "Sandshrew", type: "Ground", hp: 50 },
+            { name: "Mewtwo", type: "Psychic", hp: 200 } // Special Pokémon with more HP
+        ];
+
+        const legendaryPokemon = { name: "Arceus", type: "Normal", hp: 300 }; // Legendary Pokémon with highest HP
+
+        let selectedPokemonIndex = null;
+
+        // Type effectiveness chart
+        const typeChart = {
+            Fire: { strong: ["Grass", "Bug"], weak: ["Water", "Rock", "Fire"] },
+            Water: { strong: ["Fire", "Ground"], weak: ["Grass", "Electric", "Water"] },
+            Grass: { strong: ["Water", "Ground"], weak: ["Fire", "Bug", "Flying"] },
+            Ground: { strong: ["Fire", "Electric"], weak: ["Water", "Grass", "Ice"] },
+            Electric: { strong: ["Water", "Flying"], weak: ["Ground", "Electric"] },
+            Normal: { strong: [], weak: [] },
+            Bug: { strong: ["Grass"], weak: ["Fire", "Flying", "Rock"] },
+            Poison: { strong: ["Grass"], weak: ["Ground", "Psychic"] },
+            Flying: { strong: ["Bug", "Grass"], weak: ["Electric", "Rock"] },
+        };
+
+        function showStats(index) {
+            const pokemon = pokemonChoices[index];
+            pokemonStats.textContent = `Name: ${pokemon.name}, Type: ${pokemon.type}, HP: ${pokemon.hp}, Attack: ${pokemon.attack}, Defense: ${pokemon.defense}, Moves: ${pokemon.moves.map(move => move.name).join(", ")}`;
+            selectedPokemonIndex = index;
+            selectButton.classList.remove("hidden");
+        }
+
+        function selectPokemon() {
+            playerPokemon = pokemonChoices[selectedPokemonIndex];
+            document.getElementById("choose-pokemon").classList.add("hidden");
+            map.classList.remove("hidden");
+            message.textContent = `You chose ${playerPokemon.name}! Use arrow keys to move.`;
+
+            // Update button text with Pokémon moves
+            document.getElementById("move1-btn").textContent = playerPokemon.moves[0].name;
+            document.getElementById("move2-btn").textContent = playerPokemon.moves[1].name;
+        }
+
+        document.addEventListener("keydown", (event) => {
+            if (inBattle) return;
+
+            switch (event.key) {
+                case "ArrowUp":
+                    movePlayer(0, -60);
+                    break;
+                case "ArrowDown":
+                    movePlayer(0, 60);
+                    break;
+                case "ArrowLeft":
+                    movePlayer(-60, 0);
+                    break;
+                case "ArrowRight":
+                    movePlayer(60, 0);
+                    break;
+            }
+
+            if (isInGrass() && Math.random() < 0.3) {
+                startBattle();
+            }
+        });
+
+        function movePlayer(dx, dy) {
+            let newX = playerPosition.x + dx;
+            let newY = playerPosition.y + dy;
+
+            if (newX >= 0 && newX < map.clientWidth && newY >= 0 && newY < map.clientHeight) {
+                playerPosition.x = newX;
+                playerPosition.y = newY;
+                player.style.left = `${playerPosition.x}px`;
+                player.style.top = `${playerPosition.y}px`;
+            }
+        }
+
+        function isInGrass() {
+            return playerPosition.x >= 120 && playerPosition.x <= 480 && playerPosition.y >= 120 && playerPosition.y <= 480;
+        }
+
+        function startBattle() {
+            wildPokemon = wildPokemonPool[Math.floor(Math.random() * wildPokemonPool.length)];
+            wildPokemonDisplay.textContent = `${wildPokemon.name} (Type: ${wildPokemon.type})`;
+            enemyHP.textContent = wildPokemon.hp;
+            battleScreen.classList.remove("hidden");
+            inBattle = true;
+        }
+
+        function calculateEffectiveness(moveType, targetType) {
+            if (typeChart[moveType].strong.includes(targetType)) return 2; // Super effective
+            if (typeChart[moveType].weak.includes(targetType)) return 0.5; // Not very effective
+            return 1; // Neutral
+        }
+
+        function useMove(moveIndex) {
+            const move = playerPokemon.moves[moveIndex];
+            const effectiveness = calculateEffectiveness(move.type, wildPokemon.type);
+
+            let enemyHealth = parseInt(enemyHP.textContent);
+            const damage = (move.power + playerPokemon.attack) * effectiveness;
+            enemyHealth -= damage;
+            enemyHP.textContent = enemyHealth;
+
+            let effectivenessMessage = "";
+            if (effectiveness === 2) {
+                effectivenessMessage = "It's super effective!";
+            } else if (effectiveness === 0.5) {
+                effectivenessMessage = "It's not very effective...";
+            } else {
+                effectivenessMessage = "It's a neutral hit.";
+            }
+
+            battleMessage.textContent = `You used ${move.name}. ${effectivenessMessage}`;
+
+            if (enemyHealth <= 0) {
+                if (wildPokemon.name === "Mewtwo") {
+                    endGame("Congratulations! You defeated Mewtwo and won the game!");
+                } else if (wildPokemon.name === "Arceus") {
+                    endGame("Congratulations! You captured Arceus and won the game!");
+                } else {
+                    message.textContent = `You defeated the wild ${wildPokemon.name} with ${move.name}!`;
+                }
+                battleScreen.classList.add("hidden");
+                inBattle = false;
+                enemyHP.textContent = 50;
+                return;
+            }
+
+            let playerHealth = parseInt(playerHP.textContent);
+            playerHealth -= 5; // Simplified enemy attack
+            playerHP.textContent = playerHealth;
+
+            if (playerHealth <= 0) {
+                endGame("You fainted! Game Over.");
+            }
+        }
+
+        function endGame(messageText) {
+            gameOverMessage.textContent = messageText;
+            gameOverScreen.classList.remove("hidden");
+            map.classList.add("hidden");
+            battleScreen.classList.add("hidden"); // Hide battle screen
+        }
+
+        function restartGame() {
+            gameOverScreen.classList.add("hidden");
+            document.getElementById("choose-pokemon").classList.remove("hidden");
+            playerHP.textContent = 100;
+            playerPosition = { x: 0, y: 0 };
+            player.style.left = `${playerPosition.x}px`;
+            player.style.top = `${playerPosition.y}px`;
+            playerPokemon = null;
+            inBattle = false;
+            message.textContent = "Choose your Pokémon!";
+        }
+    </script>
+</body>
+</html>
