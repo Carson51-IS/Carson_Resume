@@ -20,7 +20,6 @@
     top: 250px;
     left: 200px; 
     width: 250px;
-    border-right: solid 1px #555555;
     padding-right: 90px;
 }
 
@@ -29,10 +28,17 @@
     top: 250px;
     right: 325px; 
     width: 200px;
-    border-left: solid 1px #555555;
     padding-left: 18px;
 }
 .footer {
     padding-top: 450px;
     text-align: center;
+}
+.tableau-container {
+    text-align: center;
+    margin: 20px auto;
+}
+.tableau-container .tableauViz {
+    display: block;
+    margin: 0 auto;
 }
