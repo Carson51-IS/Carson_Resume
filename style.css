@@ -42,3 +42,6 @@
     display: block;
     margin: 0 auto;
 }
+.bold {
+    font-weight: bolder;
+}
